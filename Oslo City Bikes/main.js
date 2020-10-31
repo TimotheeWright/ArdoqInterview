@@ -7,8 +7,10 @@ const loadMap = (station_informations, station_status) => {
         "esri/Map",
         "esri/views/MapView",
         "esri/Graphic",
-        "esri/layers/GraphicsLayer",
-    ], (Map, MapView, Graphic, GraphicsLayer) => {
+        "esri/layers/FeatureLayer",
+        "esri/symbols/PictureMarkerSymbol",
+        "esri/layers/support/FeatureReductionCluster",
+    ], (Map, MapView, Graphic, FeatureLayer, PictureMarkerSymbol,FeatureReductionCluster) => {
         const map = new Map({
             basemap: "topo-vector"
         });
@@ -16,32 +18,151 @@ const loadMap = (station_informations, station_status) => {
         const view = new MapView({
             container: "map",
             map: map,
-            center: [10.752, 59.923], // longitude, latitude
+            center: [10.738411, 59.908908], // longitude, latitude
 
-            zoom: 13
+            zoom: 15
         });
 
         const popupTemplate = {
-            title: "{station.name}",
+            title: "Station Name: {NAME}",
             content: `
-                I am located at <b>{station.address}</b>
+                I am located at <b>{address}</b>
                 <br>
-                Installed ? : {status.is_installed_string}
+                Installed ? : {is_installed_string}
                 <br>
-                Bikes Available: {status.num_bikes_available}
+                Bikes Available: {num_bikes}
                 <br>
-                Docks Available: {status.num_docks_available}
+                Docks Available: {num_docks}
             `
         };
 
-        const graphicsLayer = new GraphicsLayer();
-        map.add(graphicsLayer);
+        const clusterConfig = {
+			  type: "cluster",
+			  clusterRadius: "40px",
+			  popupTemplate: {
+			    content: "There is {cluster_count} stations there."
+			  },
+			  // You should adjust the clusterMinSize to properly fit labels
+			  clusterMinSize: "20px",
+			  clusterMaxSize: "40px",
+			  labelingInfo: [{
+			    // turn off deconfliction to ensure all clusters are labeled
+			    deconflictionStrategy: "none",
+			    labelExpressionInfo: {
+			      expression: "Text($feature.cluster_count, '#,###')"
+			    },
+			    symbol: {
+			      type: "text",
+			      color: "#004a5d",
+			      font: {
+			        weight: "bold",
+			        family: "Noto Sans",
+			        size: "12px"
+			      }
+			    },
+			    labelPlacement: "center-center",
+			  }]
+		};
+
+		/*var pointRenderer = {
+			type: "simple",  // autocasts as new SimpleRenderer()
+			symbol: {
+				type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
+				color: 
+			}
+		};*/
+
+		const bikesRenderer = {
+			type: "unique-value",  // autocasts as new UniqueValueRenderer()
+			field: "bikes_quantity",
+			uniqueValueInfos: [{
+				// All features with value of "North" will be blue
+				value: "low",
+				symbol: {
+					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
+					color: "#ff0000"
+				}
+			}, {
+				// All features with value of "East" will be green
+				value: "medium",
+				symbol: {
+					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
+					color: "#ffa500"
+				}
+			}, {
+				// All features with value of "South" will be red
+				value: "high",
+				symbol: {
+					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
+					color: "#00ff00"
+				}
+			}]
+		};
+
+		const docksRenderer = {
+			type: "unique-value",  // autocasts as new UniqueValueRenderer()
+			field: "docks_quantity",
+			uniqueValueInfos: [{
+				// All features with value of "North" will be blue
+				value: "low",
+				symbol: {
+					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
+					color: "#ff0000"
+				}
+			}, {
+				// All features with value of "East" will be green
+				value: "medium",
+				symbol: {
+					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
+					color: "#ffa500"
+				}
+			}, {
+				// All features with value of "South" will be red
+				value: "high",
+				symbol: {
+					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
+					color: "#00ff00"
+				}
+			}]
+		};
+
+		let bikesGraphics = [];
+		let bikesCircleGraphics = [];
+		let docksGraphics = [];
 
         station_informations.data.stations.forEach(station => {
 
+        	const status = getStationStatus(station.station_id);
+
+        	if (status.is_installed)
+            	status.is_installed_string = "Yes"
+            else
+            	status.is_installed_string = "No"
+
+            status.bikes_quantity = "low"
+            if (status.num_bikes_available > 2)
+            	status.bikes_quantity = "medium"
+            if (status.num_bikes_available > 10)
+            	status.bikes_quantity = "high"
+
+            status.docks_quantity = "low"
+            if (status.num_docks_available > 2)
+            	status.docks_quantity = "medium"
+            if (status.num_docks_available > 10)
+            	status.docks_quantity = "high"
+
+
+
             const attributes = {
-                station: station,
-                status: getStationStatus(station.station_id)
+            	ObjectID: station.station_id,
+                //station: station,
+                NAME: station.name,
+                address: station.address,
+                num_bikes: status.num_bikes_available,
+                num_docks: status.num_docks_available,
+                bikes_quantity: status.bikes_quantity,
+                docks_quantity: status.docks_quantity,
+                is_installed_string: status.is_installed_string
             };
 
             const point = {
@@ -50,47 +171,130 @@ const loadMap = (station_informations, station_status) => {
                 latitude: station.lat
             };
 
-            if (attributes.status.is_installed)
-            	attributes.status.is_installed_string = "Yes"
-            else
-            	attributes.status.is_installed_string = "No"
-
-            let colorBikesAvailable = [255, 0, 0]; // red
-            if (attributes.status.num_bikes_available > 2)
-            colorBikesAvailable = [255, 165, 0];
-            if (attributes.status.num_bikes_available > 10)
-            colorBikesAvailable = [0, 255, 0];
-
-            let colorDocksAvailable = [255, 0, 0]; // red
-            if (attributes.status.num_docks_available > 2)
-                colorDocksAvailable = [255, 165, 0];
-            if (attributes.status.num_docks_available > 10)
-                colorDocksAvailable = [0, 255, 0];
-
-            const symbol = {
-                type: "simple-marker",
-                color: colorBikesAvailable,
-                outline: {
-                    color: colorDocksAvailable,
-                    width: 4
-                }
+            
+            /*const symbolBikes = {
+                type: "picture-marker",  // autocasts as new PictureMarkerSymbol()
+                style: "circle",
+                url: "https://img.icons8.com/windows/30/000000/electric-bike.png",
+                width: "18px",
+                height: "18px",
             };
+            const symbolBikesCircle = {
+                type: "simple-marker",
+				  style: "circle",
+				  size: "25px",  // pixels
+				  outline: {  // autocasts as new SimpleLineSymbol()
+				    color: colorBikesAvailable,
+				    width: 2  // points
+				  }
+            };*/
 
-            const pointGraphic = new Graphic({
+            const bikesGraphic = new Graphic({
                 attributes: attributes,
-                geometry: point,
-                symbol: symbol,
-                popupTemplate: popupTemplate
+                geometry: point
+            });
+            const bikesCircleGraphic = new Graphic({
+                attributes: attributes,
+                geometry: point
             });
 
-            graphicsLayer.add(pointGraphic);
+            const docksGraphic = new Graphic({
+                attributes: attributes,
+                geometry: point
+            });
+
+            bikesGraphics.push(bikesGraphic);
+            bikesCircleGraphics.push(bikesCircleGraphic);
+            docksGraphics.push(docksGraphic);
         })
+
+		const fields = [{
+				name: "ObjectID",
+				alias: "ObjectID",
+				type: "oid"
+			},
+			{
+				name: "NAME",
+				alias: "NAME",
+				type: "string"
+			},
+			{
+				name: "address",
+				alias: "address",
+				type: "string"
+			},
+			{
+				name: "num_bikes",
+				alias: "num_bikes",
+				type: "integer"
+			},
+			{
+				name: "num_docks",
+				alias: "num_docks",
+				type: "integer"
+			},
+			{
+				name: "bikes_quantity",
+				alias: "bikes_quantity",
+				type: "string"
+			},
+			{
+				name: "docks_quantity",
+				alias: "docks_quantity",
+				type: "string"
+			},
+			{
+				name: "is_installed_string",
+				alias: "is_installed_string",
+				type: "string"
+			}]
+
+		const flBikes = new FeatureLayer({
+			source: bikesGraphics,
+			renderer: bikesRenderer,
+			objectIDField: "ObjectID",
+			fields: fields,
+			outFields: ["ObjectID", "NAME","address", "num_bikes", "num_docks","bikes_quantity","docks_quantity", "is_installed_string"],
+			popupTemplate: popupTemplate,
+			featureReduction: clusterConfig
+		});
+
+		const flDocks = new FeatureLayer({
+			visible: false,
+			source: docksGraphics,
+			renderer: docksRenderer,
+			objectIDField: "ObjectID",
+			fields: fields,
+			outFields: ["ObjectID", "NAME","address", "num_bikes", "num_docks","bikes_quantity","docks_quantity", "is_installed_string"],
+			popupTemplate: popupTemplate,
+			featureReduction: clusterConfig
+		});
+
+		map.add(flBikes);
+		map.add(flDocks);
+        	
+
+        var bikesLayerToggle = document.getElementById("bikesLayer");
+        var docksLayerToggle = document.getElementById("docksLayer");
+
+        bikesLayerToggle.addEventListener("change", function () {
+          flBikes.visible = bikesLayerToggle.checked;
+          //bikesCircleLayer.visible = bikesLayerToggle.checked;
+          flDocks.visible = docksLayerToggle.checked;
+        });
+
+        docksLayerToggle.addEventListener("change", function () {
+          flBikes.visible = bikesLayerToggle.checked;
+          //bikesCircleLayer.visible = bikesLayerToggle.checked;
+          flDocks.visible = docksLayerToggle.checked;
+        });
     });
 }
 
 $.get("http://gbfs.urbansharing.com/oslobysykkel.no/station_information.json", function (station_informations) {
     $.get("http://gbfs.urbansharing.com/oslobysykkel.no/station_status.json", function (station_status) {
         loadMap(station_informations, station_status);
+        $('#menu').fadeIn();
         $('#loader').fadeOut();
     });
 });

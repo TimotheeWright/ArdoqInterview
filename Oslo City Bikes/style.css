@@ -11,6 +11,22 @@ body {
     width: 100%;
 }
 
+#menu {
+    top: 20px;
+    right: 20px;
+    position: absolute;
+    z-index: 99;
+    background-color: white;
+    border-radius: 8px;
+    padding: 10px;
+    opacity: 0.75;
+    display: none;
+}
+
+#menu span {
+    display: block;
+}
+
 .loader-container
 {
     display: flex;
