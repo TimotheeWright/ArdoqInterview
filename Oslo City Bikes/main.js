@@ -10,7 +10,8 @@ const loadMap = (station_informations, station_status) => {
         "esri/layers/FeatureLayer",
         "esri/symbols/PictureMarkerSymbol",
         "esri/layers/support/FeatureReductionCluster",
-    ], (Map, MapView, Graphic, FeatureLayer, PictureMarkerSymbol,FeatureReductionCluster) => {
+        "esri/widgets/Search",
+    ], (Map, MapView, Graphic, FeatureLayer, PictureMarkerSymbol,FeatureReductionCluster, Search) => {
         const map = new Map({
             basemap: "topo-vector"
         });
@@ -23,6 +24,7 @@ const loadMap = (station_informations, station_status) => {
             zoom: 15
         });
 
+        // popup that appears when user clicks on a marker
         const popupTemplate = {
             title: "Station Name: {NAME}",
             content: `
@@ -36,6 +38,7 @@ const loadMap = (station_informations, station_status) => {
             `
         };
 
+ 		// marker clustering
         const clusterConfig = {
 			  type: "cluster",
 			  clusterRadius: "40px",
@@ -64,13 +67,14 @@ const loadMap = (station_informations, station_status) => {
 			  }]
 		};
 
-		/*var pointRenderer = {
-			type: "simple",  // autocasts as new SimpleRenderer()
-			symbol: {
-				type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
-				color: 
+		function getCircle(color) {
+			return {
+				type: "simple-marker",
+				style: "circle",
+				size: "20px",  // pixels
+				color: color
 			}
-		};*/
+		}
 
 		const bikesRenderer = {
 			type: "unique-value",  // autocasts as new UniqueValueRenderer()
@@ -78,24 +82,15 @@ const loadMap = (station_informations, station_status) => {
 			uniqueValueInfos: [{
 				// All features with value of "North" will be blue
 				value: "low",
-				symbol: {
-					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
-					color: "#ff0000"
-				}
+				symbol: getCircle("#ff0000")
 			}, {
 				// All features with value of "East" will be green
 				value: "medium",
-				symbol: {
-					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
-					color: "#ffa500"
-				}
+				symbol: getCircle("#ffa500")
 			}, {
 				// All features with value of "South" will be red
 				value: "high",
-				symbol: {
-					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
-					color: "#00ff00"
-				}
+				symbol: getCircle("#00ff00")
 			}]
 		};
 
@@ -126,10 +121,7 @@ const loadMap = (station_informations, station_status) => {
 			}]
 		};
 
-		let bikesGraphics = [];
-		let bikesCircleGraphics = [];
-		let docksGraphics = [];
-
+		let graphics = [];
         station_informations.data.stations.forEach(station => {
 
         	const status = getStationStatus(station.station_id);
@@ -171,41 +163,13 @@ const loadMap = (station_informations, station_status) => {
                 latitude: station.lat
             };
 
-            
-            /*const symbolBikes = {
-                type: "picture-marker",  // autocasts as new PictureMarkerSymbol()
-                style: "circle",
-                url: "https://img.icons8.com/windows/30/000000/electric-bike.png",
-                width: "18px",
-                height: "18px",
-            };
-            const symbolBikesCircle = {
-                type: "simple-marker",
-				  style: "circle",
-				  size: "25px",  // pixels
-				  outline: {  // autocasts as new SimpleLineSymbol()
-				    color: colorBikesAvailable,
-				    width: 2  // points
-				  }
-            };*/
 
-            const bikesGraphic = new Graphic({
-                attributes: attributes,
-                geometry: point
-            });
-            const bikesCircleGraphic = new Graphic({
+            const graphic = new Graphic({
                 attributes: attributes,
                 geometry: point
             });
 
-            const docksGraphic = new Graphic({
-                attributes: attributes,
-                geometry: point
-            });
-
-            bikesGraphics.push(bikesGraphic);
-            bikesCircleGraphics.push(bikesCircleGraphic);
-            docksGraphics.push(docksGraphic);
+            graphics.push(graphic);
         })
 
 		const fields = [{
@@ -250,7 +214,7 @@ const loadMap = (station_informations, station_status) => {
 			}]
 
 		const flBikes = new FeatureLayer({
-			source: bikesGraphics,
+			source: graphics,
 			renderer: bikesRenderer,
 			objectIDField: "ObjectID",
 			fields: fields,
@@ -261,7 +225,7 @@ const loadMap = (station_informations, station_status) => {
 
 		const flDocks = new FeatureLayer({
 			visible: false,
-			source: docksGraphics,
+			source: graphics,
 			renderer: docksRenderer,
 			objectIDField: "ObjectID",
 			fields: fields,
@@ -272,20 +236,35 @@ const loadMap = (station_informations, station_status) => {
 
 		map.add(flBikes);
 		map.add(flDocks);
+
+		const searchWidget = new Search({
+			view: view,
+			sources: [{
+				layer: flBikes,
+				searchFields: ["NAME"],
+				suggestionTemplate: "{NAME}",
+				exactMatch: false,
+				outFields: ["NAME", "address", "is_installed_string", "num_bikes", "num_docks"],
+				placeholder: "Enter the name of a station"
+			}],
+			includeDefaultSources: false
+		});
+       
+		view.ui.add([searchWidget],{ 
+			position: "manual"
+		});
         	
 
-        var bikesLayerToggle = document.getElementById("bikesLayer");
-        var docksLayerToggle = document.getElementById("docksLayer");
+        const bikesLayerToggle = document.getElementById("bikesLayer");
+        const docksLayerToggle = document.getElementById("docksLayer");
 
         bikesLayerToggle.addEventListener("change", function () {
           flBikes.visible = bikesLayerToggle.checked;
-          //bikesCircleLayer.visible = bikesLayerToggle.checked;
           flDocks.visible = docksLayerToggle.checked;
         });
 
         docksLayerToggle.addEventListener("change", function () {
           flBikes.visible = bikesLayerToggle.checked;
-          //bikesCircleLayer.visible = bikesLayerToggle.checked;
           flDocks.visible = docksLayerToggle.checked;
         });
     });
