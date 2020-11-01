@@ -11,7 +11,9 @@ const loadMap = (station_informations, station_status) => {
         "esri/symbols/PictureMarkerSymbol",
         "esri/layers/support/FeatureReductionCluster",
         "esri/widgets/Search",
-    ], (Map, MapView, Graphic, FeatureLayer, PictureMarkerSymbol,FeatureReductionCluster, Search) => {
+        "esri/widgets/Legend",
+        "esri/widgets/Expand",
+    ], (Map, MapView, Graphic, FeatureLayer, PictureMarkerSymbol,FeatureReductionCluster, Search,Legend,Expand) => {
         const map = new Map({
             basemap: "topo-vector"
         });
@@ -82,15 +84,18 @@ const loadMap = (station_informations, station_status) => {
 			uniqueValueInfos: [{
 				// All features with value of "North" will be blue
 				value: "low",
-				symbol: getCircle("#ff0000")
+				symbol: getCircle("#ff0000"),
+				label: "Less than 2 bikes available"
 			}, {
 				// All features with value of "East" will be green
 				value: "medium",
-				symbol: getCircle("#ffa500")
+				symbol: getCircle("#ffa500"),
+				label: "Between 2 and 10 bikes available"
 			}, {
-				// All features with value of "South" will be red
+				// All features with value of "South" will be re
 				value: "high",
-				symbol: getCircle("#00ff00")
+				symbol: getCircle("#00ff00"),
+				label: "More than 10 bikes available"
 			}]
 		};
 
@@ -103,21 +108,24 @@ const loadMap = (station_informations, station_status) => {
 				symbol: {
 					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
 					color: "#ff0000"
-				}
+				},
+				label: "Less than 2 docks available"
 			}, {
 				// All features with value of "East" will be green
-				value: "medium",
+				value: ";ediu;",
 				symbol: {
 					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
 					color: "#ffa500"
-				}
+				},
+				label: "Between 2 and 10 docks available"
 			}, {
 				// All features with value of "South" will be red
 				value: "high",
 				symbol: {
 					type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
 					color: "#00ff00"
-				}
+				},
+				label: "More than 10 docks available"
 			}]
 		};
 
@@ -216,6 +224,7 @@ const loadMap = (station_informations, station_status) => {
 		const flBikes = new FeatureLayer({
 			source: graphics,
 			renderer: bikesRenderer,
+			title: "Number of bikes",
 			objectIDField: "ObjectID",
 			fields: fields,
 			outFields: ["ObjectID", "NAME","address", "num_bikes", "num_docks","bikes_quantity","docks_quantity", "is_installed_string"],
@@ -227,6 +236,7 @@ const loadMap = (station_informations, station_status) => {
 			visible: false,
 			source: graphics,
 			renderer: docksRenderer,
+			title: "Number of docks",
 			objectIDField: "ObjectID",
 			fields: fields,
 			outFields: ["ObjectID", "NAME","address", "num_bikes", "num_docks","bikes_quantity","docks_quantity", "is_installed_string"],
@@ -253,6 +263,16 @@ const loadMap = (station_informations, station_status) => {
 		view.ui.add([searchWidget],{ 
 			position: "manual"
 		});
+
+		const legend = new Expand({
+			content: new Legend({
+				view: view,
+				style: "card" // other styles include 'classic'
+			}),
+			view: view,
+			expanded: true
+		});
+		view.ui.add(legend, "bottom-left");
         	
 
         const bikesLayerToggle = document.getElementById("bikesLayer");
